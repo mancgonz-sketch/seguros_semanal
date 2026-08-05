@@ -1190,7 +1190,7 @@ function renderCero(){
   const venPorOfi={}; venCero.forEach(v=>{ (venPorOfi[v.cr]=venPorOfi[v.cr]||[]).push(v); });
 
   const tot={ofi:MASTER.filter(o=>filtra(o.divisional)).length, ven:Object.entries(VEN).filter(([mt,v])=>cuentaVend(mt)&&v.div&&filtra(v.div)).length};
-  const porDiv=DIVS.map(d=>({d,
+  const porDiv=DIVS.filter(d=>!selD.size||selD.has(d)).map(d=>({d,
     o:MASTER.filter(x=>x.divisional===d&&!conEmision.has(x.cr)).length,
     ot:MASTER.filter(x=>x.divisional===d).length,
     v:Object.entries(VEN).filter(([mt,x])=>cuentaVend(mt)&&x.div===d&&!emitM.has(mt)).length,
@@ -1348,9 +1348,8 @@ function renderDot(){
   const el=$('dotBody'), recs=activeRecs();
   const emitM=new Set(recs.filter(r=>r.canal==='RED').map(r=>r.mat));
   const gen={}; recs.filter(r=>r.canal==='RED').forEach(r=>{ if(r.genuino) gen[r.mat]=(gen[r.mat]||0)+1; });
-  const cur=window._dotFil||'';
   const cnt=(d,f)=>Object.entries(VEN).filter(([mt,v])=>v.div===d&&f(v,mt)).length;
-  const porDiv=DIVS.map(d=>({d,
+  const porDiv=DIVS.filter(d=>!selD.size||selD.has(d)).map(d=>({d,
     tot:Object.values(VEN).filter(v=>v.div===d).length,
     fue:cnt(d,(v,mt)=>!!fueraDeVenta(mt)),
     ven:cnt(d,(v,mt)=>cuentaVend(mt)), jef:cnt(d,(v,mt)=>v.esJefe&&cuentaVend(mt)),
@@ -1358,9 +1357,14 @@ function renderDot(){
     a:Object.entries(VEN).filter(([mt,v])=>v.div===d&&cuentaVend(mt)&&emitM.has(mt)).length
   })).sort((x,y)=>pct(y.a,y.ven)-pct(x.a,x.ven));
   const T=k=>porDiv.reduce((a,x)=>a+x[k],0);
-  const gente=Object.entries(VEN).filter(([mt,v])=>cuentaVend(mt)&&v.div&&(!cur||v.div===cur))
+  if(!(window._dotSel instanceof Set)) window._dotSel=new Set();
+  const selD=window._dotSel;
+  const estado=window._dotEst||'todos';
+  const gente=Object.entries(VEN).filter(([mt,v])=>cuentaVend(mt)&&v.div&&(!selD.size||selD.has(v.div)))
     .map(([mt,v])=>({mt,...v,emitio:emitM.has(mt),gen:gen[mt]||0}))
+    .filter(p=> estado==='todos' ? true : (estado==='sin' ? !p.emitio : p.emitio))
     .sort((a,b)=>b.gen-a.gen||String(a.nom).localeCompare(String(b.nom)));
+  const totSin=Object.entries(VEN).filter(([mt,v])=>cuentaVend(mt)&&v.div&&!emitM.has(mt)).length;
   el.innerHTML=`
   <div class="note"><b>De dónde sale este cuadro.</b> Del padrón de personal al 20 de julio de 2026, con la marca de vendedor y de jefe a cargo. Se descuentan además Calafate hostería y Renovación de licencias, que no venden seguros — salvo que alguien de ahí haya emitido, en cuyo caso vuelve a contar.</div>
   <div class="card"><header><h2>Vendedores habilitados que emitieron</h2>
@@ -1388,9 +1392,18 @@ function renderDot(){
     </tbody></table></div></div>
 
   <div class="card"><header><h2>Detalle por vendedor</h2>
-    <div class="sub">${gente.filter(p=>!p.emitio).length} sin emisiones en el período</div>
-    <div class="controls" style="margin-left:auto"><select id="dotFil"><option value="">Todas las divisionales</option>
-    ${DIVS.map(d=>`<option value="${esc(d)}" ${d===cur?'selected':''}>${esc(d)}</option>`).join('')}</select></div></header>
+    <div class="sub">${fmt(gente.length)} en lista · ${fmt(totSin)} sin emisiones en total</div></header>
+    <div class="pad" style="padding-bottom:12px">
+      <div class="chips" style="margin-bottom:9px">
+        <button class="chip ${selD.size?'':'on'}" data-dger="">Todas</button>
+        ${DIVS.map(d=>`<button class="chip ${selD.has(d)?'on':''}" data-dger="${esc(d)}">${esc(d)}</button>`).join('')}
+      </div>
+      <div class="chips">
+        <button class="chip ${estado==='todos'?'on':''}" data-dest="todos">Todos</button>
+        <button class="chip ${estado==='sin'?'on':''}" data-dest="sin">Sin emisiones</button>
+        <button class="chip ${estado==='con'?'on':''}" data-dest="con">Emitieron</button>
+      </div>
+    </div>
     <div class="wrap"><table><thead><tr><th>Matrícula</th><th>Apellido y nombre</th><th>Dependencia</th><th>Divisional</th><th>Rol</th><th class="r">Genuinas</th><th>Estado</th></tr></thead>
     <tbody>${gente.map(p=>`<tr><td><span class="num dim">${esc(p.mt)}</span></td><td><b>${esc(p.nom)}</b></td>
       <td class="dim">${esc(depNombre(p.cr))}</td><td><span class="tag d">${esc(p.div)}</span></td>
@@ -1398,7 +1411,13 @@ function renderDot(){
       <td class="r"><span class="num">${p.gen||'—'}</span></td>
       <td><span class="dot ${p.emitio?'':'no'}"></span>${p.emitio?'Emitió':'Sin emisiones'}</td></tr>`).join('')}
     </tbody></table></div></div>`;
-  const s=$('dotFil'); if(s) s.addEventListener('change',e=>{window._dotFil=e.target.value;renderDot();});
+  el.querySelectorAll('[data-dger]').forEach(b=>b.addEventListener('click',()=>{
+    const g=b.dataset.dger; if(!g) selD.clear(); else selD.has(g)?selD.delete(g):selD.add(g);
+    renderDot();
+  }));
+  el.querySelectorAll('[data-dest]').forEach(b=>b.addEventListener('click',()=>{
+    window._dotEst=b.dataset.dest; renderDot();
+  }));
 }
 
 function renderMaestro(){
