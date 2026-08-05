@@ -1480,6 +1480,7 @@ $('xPub').addEventListener('click', ()=>{
   if(!records.length) return alert('Cargá primero las bases de emisiones.');
   const datos={origen:origen(), fecha:new Date().toLocaleDateString('es-AR'), corte:toISO(corte),
     rangos:SEMRANGO, cierres:CIERRES, cargas,
+    vend:LK.VEND, pers:LK.PERS, oper:LK.OPER,
     dot:MASTER.filter(o=>o.dotacion).map(o=>[o.cr,o.dotacion]),
     recs:records.map(r=>[r.cr,r.vend,toISO(r.fec),r.sem,r.cert,r.suc,r.prem,r.genuino?1:0,r.cat||'',r.pat||''])};
   // vaciar lo que se vuelve a dibujar solo, para no duplicar peso
@@ -1564,6 +1565,17 @@ $('origen') && $('origen').addEventListener('change',()=>{ try{ localStorage.set
 var PUBLICADO = null;
 try{ PUBLICADO = (typeof __PUB__!=='undefined') ? __PUB__ : null; }catch(e){}
 if(PUBLICADO){
+  Object.assign(LK.VEND, PUBLICADO.vend||{});
+  Object.assign(LK.PERS, PUBLICADO.pers||{});
+  Object.assign(LK.OPER, PUBLICADO.oper||{});
+  Object.entries(LK.VEND).forEach(([mt,v])=>{
+    VEN[mt]={nom:v[0], div:v[1], cr:v[2], esVend:v[3]==='SI', esJefe:v[4]==='SI'};
+  });
+  Object.entries(LK.PERS).forEach(([mt,v])=>{
+    const o=byCR[v[1]];
+    PERS[mt]={nom:v[0], cr:v[1]||0, div:v[2]||(o?o.divisional:''), cat:v[3], dep:v[4], ofi:o?o.oficina:v[4]};
+  });
+  const LR=$('lockRep'); if(LR) LR.style.display='none';
   Object.assign(SEMRANGO, PUBLICADO.rangos||{});
   Object.assign(CIERRES, PUBLICADO.cierres||{});
   renumerar();
@@ -1585,6 +1597,7 @@ if(PUBLICADO){
     ' · solo lectura, no hace falta cargar nada';
 }
 if(!PUBLICADO) (function(){
+  if(typeof PUBLICADO!=='undefined' && PUBLICADO) return;   // informe publicado: sin clave
   const L=$('lockRep'), I=$('lockRepClave'), B=$('lockRepBtn'), M=$('lockRepMsg');
   async function abrir(c){
     M.textContent='Verificando…';
