@@ -538,13 +538,10 @@ const PERIODOS = [];
 const SEMRANGO = {};                       // clave de cierre -> [inicioISO, finISO]
 const finDeMes = d => new Date(d.getFullYear(), d.getMonth()+1, 0);
 const iniDeMes = d => new Date(d.getFullYear(), d.getMonth(), 1);
-function tramo(d, per){                    // tramo de semana al que pertenece la fecha, recortado al mes
+function tramo(d, per){          // la semana queda entera: nunca se parte por fin de mes
   let ini, fin;
   if(per && d>=per.ini && d<=per.fin){ ini=per.ini; fin=per.fin; }
   else { fin=cierraMiercoles(d); ini=new Date(fin); ini.setDate(ini.getDate()-6); }
-  const mi=iniDeMes(d), mf=finDeMes(d);
-  if(ini<mi) ini=mi;
-  if(fin>mf) fin=mf;
   return {ini, fin, key:toISO(fin)};
 }
 function registrarTramo(t){ if(!SEMRANGO[t.key]) SEMRANGO[t.key]=[toISO(t.ini), t.key]; }
@@ -871,7 +868,11 @@ function msg(kind, html){ $('loadMsg').innerHTML = `<div class="note ${kind}">${
 
 /* ========== AGREGACIÓN ========== */
 const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-const mesDe = sem => sem.slice(0,7);                 // la clave de semana ya viene recortada al mes
+// Una semana pertenece al mes en que ARRANCA: la del 31/07 al 05/08 es de julio.
+const mesDe = sem => {
+  const r = SEMRANGO[sem];
+  return (r ? r[0] : sem).slice(0,7);
+};
 const mesNom = m => MESES[+m.slice(5,7)-1]+' '+m.slice(0,4);
 var CIERRES={};
 function mesesConDatos(){ return [...new Set(records.map(r=>mesDe(r.sem)))].sort(); }
@@ -940,8 +941,10 @@ function renderMeses(){
     return toISO(d);
   }
   const completo=m=>{
-    const fin=records.filter(r=>mesDe(r.sem)===m).map(r=>r.sem).sort().pop();
-    return !!fin && fin>=ultimoDia(m);
+    const sems=[...new Set(records.filter(r=>mesDe(r.sem)===m).map(r=>r.sem))];
+    if(!sems.length) return false;
+    const fin=sems.sort().pop();                 // cierre de la última semana del mes
+    return fin>=ultimoDia(m);                    // llegó o pasó el último día
   };
   const enCurso=m=>!CIERRES[m] && !completo(m);
   const dat=ms.map(m=>{
@@ -960,7 +963,7 @@ function renderMeses(){
     const v=(b-a)/a*100; const c=v>=0?'var(--pos)':'var(--neg)';
     return ` <span class="mini" style="color:${c}">${v>=0?'▲':'▼'}${fmt1(Math.abs(v))}%</span>`; };
   el.innerHTML=`
-  <div class="note"><b>Cómo se agrupan.</b> Las semanas cierran los miércoles, salvo la última de cada mes, que cierra el último día del mes. Una semana que va del 27 de agosto al 3 de septiembre se parte en dos: del 27 al 31 cuenta en agosto y del 1 al 3 abre septiembre. Por eso puede haber una quinta semana corta. Un mes queda completo cuando llega la semana que cierra el último día; hasta entonces figura en curso, sin flechas de variación y sin opción de cerrarlo.</div>
+  <div class="note"><b>Cómo se agrupan.</b> Las semanas quedan enteras, tal como las manda el reporte, y pertenecen al mes en que arrancan. Una semana del 27 de agosto al 2 de septiembre cuenta completa en agosto. El mes queda cerrado cuando una de sus semanas llega al último día o lo pasa; hasta entonces figura en curso, sin flechas de variación.</div>
   <div class="card"><header><h2>Cierre mensual</h2></header>
     <div class="wrap"><table><thead><tr><th>Mes</th><th class="r">Semanas</th><th class="r">Emisiones</th>
       <th class="r">Genuinas</th><th class="r">% gen.</th><th class="r">Red</th><th class="r">Genuinas red</th>
@@ -1123,7 +1126,7 @@ function renderPais(){
         <td class="r"><span class="num">${fmt1(rg/MASTER.length)}</span></td><td></td></tr>
       </tbody></table></div></div>
 
-  <div class="card"><header><h2>Evolución semanal</h2><div class="sub">Cierran miércoles, salvo la última del mes</div></header>
+  <div class="card"><header><h2>Evolución semanal</h2><div class="sub">Semanas completas, asignadas al mes en que arrancan</div></header>
     <div class="wrap"><table>
       <thead><tr><th>Gerencia divisional</th>${sem.map(s=>`<th class="r">${weekLbl(s)}</th>`).join('')}<th class="r">Acumulado</th></tr></thead>
       <tbody>${rows.map(r=>`<tr><td><b>${esc(r.k)}</b></td>
