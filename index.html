@@ -580,6 +580,13 @@ function periodoDeNombre(nombre){     // INGRESOS-EMITIDOS-DEL-20260723-AL-20260
   return {ini:P(m[1]), fin:P(m[2])};
 }
 function semanas(recs){ return [...new Set(recs.map(r=>r.sem))].sort(); }
+// Semanas completas: si una semana toca el período elegido, se muestra entera.
+function recsSemana(){
+  const m=mesActual();
+  if(!m) return records.filter(r=>r.fec<=corte);
+  const claves=new Set(records.filter(r=>mesRec(r)===m).map(r=>r.sem));
+  return records.filter(r=>claves.has(r.sem) && r.fec<=corte);
+}
 // En "Todo el acumulado" se muestran las últimas 4 semanas para que la tabla entre en pantalla.
 function semanasVista(recs){
   const s=semanas(recs);
@@ -1094,6 +1101,9 @@ function renderPais(){
   const crAct=new Set(R.map(r=>r.cr)).size;
   const sem=semanasVista(recs);
   const rows=agg(R,r=>r.div).sort((a,b)=>b.gen-a.gen);
+  const Rsem=red(recsSemana());                    // semanas completas para el cuadro de evolución
+  const semC=semanasVista(Rsem);
+  const rowsSem=agg(Rsem,r=>r.div).sort((a,b)=>b.tot-a.tot);
   const maxG=Math.max(1,...rows.map(r=>r.gen));
 
   el.innerHTML=`
@@ -1141,15 +1151,15 @@ function renderPais(){
         <td class="r"><span class="num">${fmt1(rg/MASTER.length)}</span></td><td></td></tr>
       </tbody></table></div></div>
 
-  <div class="card"><header><h2>Evolución semanal</h2><div class="sub">Semanas completas, asignadas al mes en que arrancan</div></header>
+  <div class="card" id="evoSem"><header><h2>Evolución semanal</h2><div class="sub">Semanas completas, tal como se informan</div></header>
     <div class="wrap"><table>
-      <thead><tr><th>Gerencia divisional</th>${sem.map(s=>`<th class="r">${weekLbl(s)}</th>`).join('')}<th class="r">Acumulado</th></tr></thead>
-      <tbody>${rows.map(r=>`<tr><td><b>${esc(r.k)}</b></td>
-        ${sem.map(s=>`<td class="r"><span class="num ${r.sem[s]?'':'dim'}">${r.sem[s]||'—'}</span></td>`).join('')}
+      <thead><tr><th>Gerencia divisional</th>${semC.map(s=>`<th class="r">${weekLbl(s)}</th>`).join('')}<th class="r">Acumulado</th></tr></thead>
+      <tbody>${rowsSem.map(r=>`<tr><td><b>${esc(r.k)}</b></td>
+        ${semC.map(s=>`<td class="r"><span class="num ${r.sem[s]?'':'dim'}">${r.sem[s]||'—'}</span></td>`).join('')}
         <td class="r"><span class="num"><b>${fmt(r.tot)}</b></span></td></tr>`).join('')}
       <tr class="tot"><td>TOTAL RED</td>
-        ${sem.map(s=>`<td class="r"><span class="num">${fmt(rows.reduce((a,r)=>a+(r.sem[s]||0),0))}</span></td>`).join('')}
-        <td class="r"><span class="num">${fmt(R.length)}</span></td></tr>
+        ${semC.map(s=>`<td class="r"><span class="num">${fmt(rowsSem.reduce((a,r)=>a+(r.sem[s]||0),0))}</span></td>`).join('')}
+        <td class="r"><span class="num">${fmt(rowsSem.reduce((a,r)=>a+r.tot,0))}</span></td></tr>
       </tbody></table></div></div>`;
 }
 
