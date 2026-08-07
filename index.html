@@ -1190,7 +1190,7 @@ function renderCero(){
   const venPorOfi={}; venCero.forEach(v=>{ (venPorOfi[v.cr]=venPorOfi[v.cr]||[]).push(v); });
 
   const tot={ofi:MASTER.filter(o=>filtra(o.divisional)).length, ven:Object.entries(VEN).filter(([mt,v])=>cuentaVend(mt)&&v.div&&filtra(v.div)).length};
-  const porDiv=DIVS.filter(d=>!selD.size||selD.has(d)).map(d=>({d,
+  const porDiv=DIVS.filter(d=>filtra(d)).map(d=>({d,
     o:MASTER.filter(x=>x.divisional===d&&!conEmision.has(x.cr)).length,
     ot:MASTER.filter(x=>x.divisional===d).length,
     v:Object.entries(VEN).filter(([mt,x])=>cuentaVend(mt)&&x.div===d&&!emitM.has(mt)).length,
