@@ -148,6 +148,8 @@ body.cmp .brand span{font-size:10px}
 body.cmp th{top:41px}
 .densidad{display:flex;align-items:center;gap:6px;font-size:11px;color:#C9C2AE;cursor:pointer;white-space:nowrap}
 .mini{font-size:11px;color:var(--mut)}
+td.nw,th.nw{white-space:nowrap}
+td:first-child{white-space:normal}
 .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .chip{padding:4px 11px;border:1px solid var(--line);background:#fff;border-radius:14px;font-size:12px;
   font-weight:600;color:var(--mut);cursor:pointer;white-space:nowrap}
@@ -498,6 +500,13 @@ let corte = null;
 const $ = id => document.getElementById(id);
 const fmt = n => (n==null||isNaN(n)) ? '—' : Number(n).toLocaleString('es-AR');
 const fmt1 = n => (n==null||isNaN(n)||!isFinite(n)) ? '—' : Number(n).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1});
+const moneyC = n => {
+  if(n==null||isNaN(n)) return '—';
+  const v=Number(n);
+  if(Math.abs(v)>=1e6) return '$ '+(v/1e6).toLocaleString('es-AR',{maximumFractionDigits:1})+' M';
+  if(Math.abs(v)>=1e3) return '$ '+(v/1e3).toLocaleString('es-AR',{maximumFractionDigits:0})+' mil';
+  return '$ '+v.toLocaleString('es-AR',{maximumFractionDigits:0});
+};
 const money = n => (n==null||isNaN(n)) ? '—' : '$ '+Number(n).toLocaleString('es-AR',{maximumFractionDigits:0});
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -571,6 +580,11 @@ function periodoDeNombre(nombre){     // INGRESOS-EMITIDOS-DEL-20260723-AL-20260
   return {ini:P(m[1]), fin:P(m[2])};
 }
 function semanas(recs){ return [...new Set(recs.map(r=>r.sem))].sort(); }
+// En "Todo el acumulado" se muestran las últimas 4 semanas para que la tabla entre en pantalla.
+function semanasVista(recs){
+  const s=semanas(recs);
+  return (!mesActual() && s.length>4) ? s.slice(-4) : s;
+}
 
 /* ========== NAVEGACIÓN ========== */
 const TABS = [['cargar','Cargar bases'],['pais','Resumen país'],['meses','Meses'],['canales','Canales'],['cero','Sin producción'],['oficinas','Oficinas'],['vend','Vendedores'],['dotacion','Dotación'],['maestro','Maestro'],['export','Exportar']];
@@ -855,7 +869,7 @@ $('proc').addEventListener('click', ()=>{
   if(mapSel.prem && escala>1) m += ` · premio dividido por ${fmt(escala)}, promedio ${money(records.reduce((a,r)=>a+r.prem,0)/records.length)}`;
   const nm = unmatched.reduce((a,x)=>a+x[1],0);
   if(nm) m += ` · <span style="color:var(--neg)">${fmt(nm)} filas sin dependencia reconocida</span>`;
-  const cerr=[...new Set(records.slice(-nuevos).map(r=>mesDe(r.sem)))].filter(x=>CIERRES[x]);
+  const cerr=[...new Set(records.slice(-nuevos).map(mesRec))].filter(x=>CIERRES[x]);
   if(cerr.length) m += '<div class="mini" style="margin-top:8px;color:var(--oro-2)"><b>Atención:</b> entraron pólizas de '+cerr.map(x=>esc(mesNom(x))).join(', ')+', que ya figuraba cerrado. Revisá si corresponde reabrirlo.</div>';
   if(desfasaje.length) m += '<div class="mini" style="margin-top:8px;color:var(--neg)"><b>Revisar:</b> '+desfasaje.map(esc).join(' · ')+'</div>';
   msg(nm||desfasaje.length?'':'ok', m);
@@ -868,18 +882,17 @@ function msg(kind, html){ $('loadMsg').innerHTML = `<div class="note ${kind}">${
 
 /* ========== AGREGACIÓN ========== */
 const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-// Una semana pertenece al mes en que ARRANCA: la del 31/07 al 05/08 es de julio.
-const mesDe = sem => {
-  const r = SEMRANGO[sem];
-  return (r ? r[0] : sem).slice(0,7);
-};
+// Las semanas quedan enteras. Para el MES, cada póliza cuenta según su propia fecha:
+// la del 31/07 va a julio y la del 01/08 a agosto, aunque compartan semana.
+function mesDe(sem){ const r=SEMRANGO[sem]; return (r?r[0]:sem).slice(0,7); }
+function mesRec(r){ return toISO(r.fec).slice(0,7); }
 const mesNom = m => MESES[+m.slice(5,7)-1]+' '+m.slice(0,4);
 var CIERRES={};
-function mesesConDatos(){ return [...new Set(records.map(r=>mesDe(r.sem)))].sort(); }
+function mesesConDatos(){ return [...new Set(records.map(mesRec))].sort(); }
 function mesActual(){ const s=$('mesSel'); return s?s.value:''; }
 function activeRecs(){
   const m=mesActual();
-  return records.filter(r=>r.fec<=corte && (!m||mesDe(r.sem)===m));
+  return records.filter(r=>r.fec<=corte && (!m||mesRec(r)===m));
 }
 var mesElegido=false;
 function pintarMeses(){
@@ -892,7 +905,7 @@ function pintarMeses(){
 }
 function corteAlMes(){
   const m=mesActual();
-  const fin=records.filter(r=>!m||mesDe(r.sem)===m).map(r=>r.sem).sort().pop();
+  const fin=records.filter(r=>!m||mesRec(r)===m).map(r=>r.sem).sort().pop();
   if(fin){ corte=new Date(fin+'T00:00:00'); $('corte').value=fin; setJueLbl(); }
 }
 function red(recs){ return recs.filter(r=>r.canal==='RED'); }
@@ -941,14 +954,13 @@ function renderMeses(){
     return toISO(d);
   }
   const completo=m=>{
-    const sems=[...new Set(records.filter(r=>mesDe(r.sem)===m).map(r=>r.sem))];
-    if(!sems.length) return false;
-    const fin=sems.sort().pop();                 // cierre de la última semana del mes
-    return fin>=ultimoDia(m);                    // llegó o pasó el último día
+    // el mes cierra cuando llegó una semana que cubre su último día
+    const fin=[...new Set(records.filter(r=>mesRec(r)===m).map(r=>r.sem))].sort().pop();
+    return !!fin && fin>=ultimoDia(m);
   };
   const enCurso=m=>!CIERRES[m] && !completo(m);
   const dat=ms.map(m=>{
-    const rs=records.filter(r=>mesDe(r.sem)===m);
+    const rs=records.filter(r=>mesRec(r)===m);
     const R=rs.filter(r=>r.canal==='RED'), rg=R.filter(r=>r.genuino).length;
     return {m, sem:[...new Set(rs.map(r=>r.sem))].length, tot:rs.length,
       gen:rs.filter(r=>r.genuino).length, red:R.length, rg,
@@ -957,13 +969,13 @@ function renderMeses(){
   });
   const base=plantel(null);
   const divs=DIVS.map(d=>({d, v:vendedores(d), x:ms.map(m=>
-    records.filter(r=>mesDe(r.sem)===m&&r.canal==='RED'&&r.div===d&&r.genuino).length)}))
+    records.filter(r=>mesRec(r)===m&&r.canal==='RED'&&r.div===d&&r.genuino).length)}))
     .sort((a,b)=>(b.x[b.x.length-1]/(b.v||1))-(a.x[a.x.length-1]/(a.v||1)));
   const flecha=(a,b)=>{ if(a==null||b==null||!a) return '';
     const v=(b-a)/a*100; const c=v>=0?'var(--pos)':'var(--neg)';
     return ` <span class="mini" style="color:${c}">${v>=0?'▲':'▼'}${fmt1(Math.abs(v))}%</span>`; };
   el.innerHTML=`
-  <div class="note"><b>Cómo se agrupan.</b> Las semanas quedan enteras, tal como las manda el reporte, y pertenecen al mes en que arrancan. Una semana del 27 de agosto al 2 de septiembre cuenta completa en agosto. El mes queda cerrado cuando una de sus semanas llega al último día o lo pasa; hasta entonces figura en curso, sin flechas de variación.</div>
+  <div class="note"><b>Cómo se agrupan.</b> Las semanas se muestran enteras, tal como las manda el reporte. El mes, en cambio, corta por fecha: una semana del 31 de julio al 5 de agosto aporta el día 31 a julio y del 1 al 5 a agosto. El mes queda cerrado cuando llega la semana que cubre su último día.</div>
   <div class="card"><header><h2>Cierre mensual</h2></header>
     <div class="wrap"><table><thead><tr><th>Mes</th><th class="r">Semanas</th><th class="r">Emisiones</th>
       <th class="r">Genuinas</th><th class="r">% gen.</th><th class="r">Red</th><th class="r">Genuinas red</th>
@@ -1077,7 +1089,7 @@ function renderPais(){
   const rg=R.filter(r=>r.genuino).length;
   const dotT=denom(recs,null), actT=activosOf(recs,null), asignT=plantel(null, capBase()==='act'?'ven':null);
   const crAct=new Set(R.map(r=>r.cr)).size;
-  const sem=semanas(recs);
+  const sem=semanasVista(recs);
   const rows=agg(R,r=>r.div).sort((a,b)=>b.gen-a.gen);
   const maxG=Math.max(1,...rows.map(r=>r.gen));
 
@@ -1141,7 +1153,7 @@ function renderPais(){
 function renderCanal(){
   const el=$('canBody'), recs=activeRecs();
   if(!recs.length) return noData(el,'la apertura por canal');
-  const sem=semanas(recs), tot=recs.length;
+  const sem=semanasVista(recs), tot=recs.length;
   const rows=agg(recs,r=>r.canal).sort((a,b)=>b.tot-a.tot);
   const conPrem=recs.some(r=>r.prem>0);
   el.innerHTML=`
@@ -1155,14 +1167,14 @@ function renderCanal(){
         <td class="r"><span class="num" style="color:var(--neg)">${r.nog||'—'}</span></td>
         <td class="r"><span class="num">${fmt1(pct(r.gen,r.tot))}%</span></td>
         <td class="r"><span class="num"><b>${fmt1(pct(r.tot,tot))}%</b></span></td>
-        ${conPrem?`<td class="r"><span class="num">${money(r.prem)}</span></td>`:''}
+        ${conPrem?`<td class="r nw" title="${money(r.prem)}"><span class="num">${moneyC(r.prem)}</span></td>`:''}
         ${sem.map(s=>`<td class="r"><span class="num ${r.sem[s]?'':'dim'}">${r.sem[s]||'—'}</span></td>`).join('')}</tr>`).join('')}
       <tr class="tot"><td>TOTAL PAÍS</td><td class="r"><span class="num">${fmt(tot)}</span></td>
         <td class="r"><span class="num">${fmt(recs.filter(r=>r.genuino).length)}</span></td>
         <td class="r"><span class="num">${fmt(recs.filter(r=>!r.genuino).length)}</span></td>
         <td class="r"><span class="num">${fmt1(pct(recs.filter(r=>r.genuino).length,tot))}%</span></td>
         <td class="r"><span class="num">100,0%</span></td>
-        ${conPrem?`<td class="r"><span class="num">${money(recs.reduce((a,r)=>a+r.prem,0))}</span></td>`:''}
+        ${conPrem?`<td class="r nw"><span class="num">${moneyC(recs.reduce((a,r)=>a+r.prem,0))}</span></td>`:''}
         ${sem.map(s=>`<td class="r"><span class="num">${fmt(recs.filter(r=>r.sem===s).length)}</span></td>`).join('')}</tr>
       </tbody></table></div></div>
 
@@ -1305,7 +1317,7 @@ function renderVend(){
   const sel=window._venSel;
   [...sel].forEach(g=>{ if(!ger.includes(g)) sel.delete(g); });
   const f = sel.size ? recs.filter(r=>sel.has(r.div)) : recs;
-  const sem=semanas(recs);
+  const sem=semanasVista(recs);
   const rows=agg(f,r=>r.vend+'|'+r.vendNom+'|'+r.div).sort((a,b)=>b.gen-a.gen);
   const maxG=Math.max(1,...rows.map(r=>r.gen));
   const porGer={}; recs.forEach(r=>porGer[r.div]=(porGer[r.div]||0)+1);
