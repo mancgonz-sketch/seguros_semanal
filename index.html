@@ -1345,6 +1345,8 @@ function renderVend(){
 }
 
 function renderDot(){
+  if(!(window._dotSel instanceof Set)) window._dotSel=new Set();
+  const selD=window._dotSel;
   const el=$('dotBody'), recs=activeRecs();
   const emitM=new Set(recs.filter(r=>r.canal==='RED').map(r=>r.mat));
   const gen={}; recs.filter(r=>r.canal==='RED').forEach(r=>{ if(r.genuino) gen[r.mat]=(gen[r.mat]||0)+1; });
@@ -1357,8 +1359,6 @@ function renderDot(){
     a:Object.entries(VEN).filter(([mt,v])=>v.div===d&&cuentaVend(mt)&&emitM.has(mt)).length
   })).sort((x,y)=>pct(y.a,y.ven)-pct(x.a,x.ven));
   const T=k=>porDiv.reduce((a,x)=>a+x[k],0);
-  if(!(window._dotSel instanceof Set)) window._dotSel=new Set();
-  const selD=window._dotSel;
   const estado=window._dotEst||'todos';
   const gente=Object.entries(VEN).filter(([mt,v])=>cuentaVend(mt)&&v.div&&(!selD.size||selD.has(v.div)))
     .map(([mt,v])=>({mt,...v,emitio:emitM.has(mt),gen:gen[mt]||0}))
