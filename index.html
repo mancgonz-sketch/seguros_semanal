@@ -968,9 +968,12 @@ function renderMeses(){
       ofi:new Set(R.map(r=>r.cr)).size};
   });
   const base=plantel(null);
+  // se ordena por la cápita del último mes COMPLETO: un mes a medias no sirve para rankear
+  let iOrd = ms.length-1;
+  while(iOrd>0 && enCurso(ms[iOrd])) iOrd--;
   const divs=DIVS.map(d=>({d, v:vendedores(d), x:ms.map(m=>
     records.filter(r=>mesRec(r)===m&&r.canal==='RED'&&r.div===d&&r.genuino).length)}))
-    .sort((a,b)=>(b.x[b.x.length-1]/(b.v||1))-(a.x[a.x.length-1]/(a.v||1)));
+    .sort((a,b)=>b.x[iOrd]-a.x[iOrd]);   // por cantidad de genuinas del último mes completo
   const flecha=(a,b)=>{ if(a==null||b==null||!a) return '';
     const v=(b-a)/a*100; const c=v>=0?'var(--pos)':'var(--neg)';
     return ` <span class="mini" style="color:${c}">${v>=0?'▲':'▼'}${fmt1(Math.abs(v))}%</span>`; };
@@ -999,7 +1002,7 @@ function renderMeses(){
     </tbody></table></div></div>
 
   ${ms.length>1?`<div class="card"><header><h2>Genuinas de red por gerencia divisional</h2>
-    <div class="sub">Cápita sobre vendedores habilitados</div></header>
+    <div class="sub">Cápita sobre vendedores habilitados · ordenado por genuinas de ${esc(mesNom(ms[iOrd]))}</div></header>
     <div class="wrap"><table><thead><tr><th>Gerencia divisional</th><th class="r">Vendedores</th>
       ${ms.map(m=>`<th class="r">${esc(mesNom(m))}${enCurso(m)?' *':''}</th>`).join('')}
       ${ms.map(m=>`<th class="r">Cápita ${esc(mesNom(m).split(' ')[0])}</th>`).join('')}</tr></thead>
